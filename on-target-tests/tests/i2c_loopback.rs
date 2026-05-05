@@ -12,7 +12,7 @@
 use defmt_rtt as _; // defmt transport
 use defmt_test as _;
 use panic_probe as _;
-use rp2040_hal as hal; // memory layout // panic handler
+use rp235x_hal as hal; // memory layout // panic handler
 
 use hal::pac::interrupt;
 

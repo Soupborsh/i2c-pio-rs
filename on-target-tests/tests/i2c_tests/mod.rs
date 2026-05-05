@@ -1,7 +1,7 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use rp2040_hal::{
+use rp235x_hal::{
     self as hal,
     gpio::{
         bank0::{Gpio0, Gpio1, Gpio2, Gpio3},
@@ -89,7 +89,7 @@ impl Iterator for Generator {
 
 fn target_handler(
     target: &mut Target,
-    evt: rp2040_hal::i2c::peripheral::Event,
+    evt: rp235x_hal::i2c::peripheral::Event,
     payload: &mut TargetState,
     throttle: bool,
 ) {
@@ -127,5 +127,5 @@ fn target_handler(
     }
 }
 
-pub trait ValidAddress: i2c_pio::ValidAddressMode + rp2040_hal::i2c::ValidAddress {}
-impl<T> ValidAddress for T where T: rp2040_hal::i2c::ValidAddress + i2c_pio::ValidAddressMode {}
+pub trait ValidAddress: i2c_pio::ValidAddressMode + rp235x_hal::i2c::ValidAddress {}
+impl<T> ValidAddress for T where T: rp235x_hal::i2c::ValidAddress + i2c_pio::ValidAddressMode {}

@@ -9,13 +9,8 @@ use hal::{
     pio::{PIOExt, UninitStateMachine, PIO, PIO0SM0},
 };
 use i2c_pio::Error;
-use rp2040_hal::{
-    self as hal,
-    clocks::init_clocks_and_plls,
-    gpio::{FunctionI2C, Pin, PullUp},
-    pac,
-    watchdog::Watchdog,
-    Clock, Timer,
+use rp235x_hal::{
+    self as hal, Clock, Timer, clocks::init_clocks_and_plls, gpio::{FunctionI2C, Pin, PullUp}, pac, timer::CopyableTimer0, watchdog::Watchdog
 };
 
 use super::{
@@ -27,14 +22,14 @@ pub struct State {
     pio: PIO<PIO0>,
     i2c_components: Option<((CtrlPinSda, CtrlPinScl), UninitStateMachine<PIO0SM0>)>,
 
-    timer: hal::Timer,
+    timer: hal::Timer<CopyableTimer0>,
     resets: hal::pac::RESETS,
     ref_clock_freq: HertzU32,
 }
 
 static TARGET: MutexCell<Option<Target>> = Mutex::new(RefCell::new(None));
 static PAYLOAD: MutexCell<TargetState> = MutexCell::new(RefCell::new(TargetState::new()));
-static TIMER: MutexCell<Option<Timer>> = MutexCell::new(RefCell::new(None));
+static TIMER: MutexCell<Option<Timer<CopyableTimer0>>> = MutexCell::new(RefCell::new(None));
 
 macro_rules! assert_vec_eq {
     ($e:expr) => {
@@ -76,7 +71,7 @@ pub fn system_setup<T: ValidAddress>(xtal_freq_hz: u32, addr: T) -> State {
     .ok()
     .unwrap();
 
-    let timer = hal::Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
+    let timer = hal::Timer::new_timer0(pac.TIMER0, &mut pac.RESETS, &clocks);
 
     // The single-cycle I/O block controls our GPIO pins
     let mut sio = hal::Sio::new(pac.SIO);
@@ -105,7 +100,7 @@ pub fn system_setup<T: ValidAddress>(xtal_freq_hz: u32, addr: T) -> State {
 
     critical_section::with(|cs| TARGET.replace(cs, Some(i2c_target)));
 
-    static STACK: rp2040_hal::multicore::Stack<10240> = rp2040_hal::multicore::Stack::new();
+    static STACK: rp235x_hal::multicore::Stack<10240> = rp235x_hal::multicore::Stack::new();
     unsafe {
         // delegate I2C1 irqs to core 1
         // If the IRQ is not defined, core 1 will just spin in the default IRQ without doing anything
@@ -114,8 +109,8 @@ pub fn system_setup<T: ValidAddress>(xtal_freq_hz: u32, addr: T) -> State {
             .get_mut(1)
             .expect("core 1 is not available")
             .spawn(STACK.take().unwrap(), || {
-                pac::NVIC::unpend(hal::pac::Interrupt::I2C1_IRQ);
-                pac::NVIC::unmask(hal::pac::Interrupt::I2C1_IRQ);
+                cortex_m::peripheral::NVIC::unpend(hal::pac::Interrupt::I2C1_IRQ);
+                cortex_m::peripheral::NVIC::unmask(hal::pac::Interrupt::I2C1_IRQ);
 
                 loop {
                     cortex_m::asm::wfi()
@@ -208,7 +203,7 @@ pub fn peripheral_handler() {
 
         while let Some(evt) = target.next_event() {
             if let Some(t) = timer.as_mut() {
-                use embedded_hal_0_2::blocking::delay::DelayUs;
+                use embedded_hal::delay::DelayNs;
                 t.delay_us(50);
             }
 
@@ -223,7 +218,7 @@ pub fn peripheral_handler() {
 }
 
 pub fn write<T: ValidAddress>(state: &mut State, addr: T) {
-    use embedded_hal_0_2::blocking::i2c::Write;
+    use embedded_hal::i2c::I2c;
     let mut controller = test_setup(state, addr, false);
 
     let samples: FIFOBuffer = Generator::seq().take(25).collect();
@@ -271,7 +266,7 @@ pub fn write_iter_read<T: ValidAddress>(
 }
 
 pub fn write_read<T: ValidAddress>(state: &mut State, addr: T, restart_count: RangeInclusive<u32>) {
-    use embedded_hal_0_2::blocking::i2c::WriteRead;
+    use embedded_hal::i2c::I2c;
     let mut controller = test_setup(state, addr, false);
 
     let samples_seq: FIFOBuffer = Generator::seq().take(25).collect();
@@ -289,7 +284,7 @@ pub fn write_read<T: ValidAddress>(state: &mut State, addr: T, restart_count: Ra
 }
 
 pub fn read<T: ValidAddress>(state: &mut State, addr: T, restart_count: RangeInclusive<u32>) {
-    use embedded_hal_0_2::blocking::i2c::Read;
+    use embedded_hal::i2c::I2c;
     let mut controller = test_setup(state, addr, false);
 
     let mut v = [0u8; 25];
