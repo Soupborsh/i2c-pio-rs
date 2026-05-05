@@ -47,7 +47,7 @@ use fugit::HertzU32;
 use heapless::Deque;
 use i2c_cmd::{restart, start, CmdWord, Data};
 use pio::Instruction;
-use rp2040_hal::{
+use rp235x_hal::{
     gpio::{
         AnyPin, Function, FunctionNull, OutputEnableOverride, Pin, PinId, PullType, PullUp,
         ValidFunction,
@@ -60,7 +60,6 @@ use rp2040_hal::{
 
 use crate::i2c_cmd::stop;
 
-mod eh0_2;
 mod eh1_0;
 mod i2c_cmd;
 
@@ -72,7 +71,7 @@ pub enum AddressLength {
     _10,
 }
 pub trait ValidAddressMode:
-    Copy + Into<u16> + embedded_hal::i2c::AddressMode + embedded_hal_0_2::blocking::i2c::AddressMode
+    Copy + Into<u16> + embedded_hal::i2c::AddressMode + embedded_hal::i2c::AddressMode
 {
     fn address_len() -> AddressLength;
 }
@@ -154,7 +153,7 @@ where
     SCL: AnyPin,
 {
     pio: &'pio mut PIO<P>,
-    sm: StateMachine<(P, SMI), rp2040_hal::pio::Running>,
+    sm: StateMachine<(P, SMI), rp235x_hal::pio::Running>,
     tx: Tx<(P, SMI)>,
     rx: Rx<(P, SMI)>,
     sda: (Pin<SDA::Id, P::PinFunction, PullUp>, OutputEnableOverride),
@@ -187,7 +186,7 @@ where
     {
         let (sda, scl): (SDA::Type, SCL::Type) = (sda.into(), scl.into());
 
-        let mut program = pio_proc::pio_asm!(
+        let mut program = pio::pio_asm!(
             ".side_set 1 opt pindirs"
 
             "byte_nack:"
@@ -256,9 +255,9 @@ where
         let frac: u8 = frac as u8;
 
         // init
-        let (mut sm, rx, tx) = rp2040_hal::pio::PIOBuilder::from_installed_program(installed)
+        let (mut sm, rx, tx) = rp235x_hal::pio::PIOBuilder::from_installed_program(installed)
             // use both RX & TX FIFO
-            .buffers(rp2040_hal::pio::Buffers::RxTx)
+            .buffers(rp235x_hal::pio::Buffers::RxTx)
             // Pin configuration
             .set_pins(sda.id().num, 1)
             .out_pins(sda.id().num, 1)
